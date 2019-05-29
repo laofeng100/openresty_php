@@ -1,4 +1,4 @@
-## anp
+## 将openresty和php7 做成一个镜像，采用supervisor对进程管理。减少外部依赖，做到灵活部署。
 ```
 1.更新说明
 支持grpc依赖扩展grpc、protobuf
