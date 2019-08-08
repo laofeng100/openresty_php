@@ -1,16 +1,11 @@
-FROM alpine:3.9
-
+#FROM alpine:3.9
+FROM geekidea/alpine-a:3.8
 MAINTAINER gongyishu development "gongyishu@le.com"
 
 USER root
 WORKDIR /
-#ENV APP_NAME anp
-#ENV APP_PATH /var/www/html
-#ENV APP_PATH_INDEX /var/www/html
-#ENV APP_PATH_404 /var/www/html
-#ENV APP_INIT_SHELL ""
-#ENV APP_MONITOR_HOOK DINGTALK-HOOK
 
+ENV APP_MONITOR_HOOK https://oapi.dingtalk.com/xxx
 ENV PHP_MEM_LIMIT 512M
 ENV PHP_POST_MAX_SIZE 100M
 ENV PHP_UPLOAD_MAX_FILESIZE 100M
@@ -23,9 +18,6 @@ ENV FPM_MAX_REQUESTS 200
 ENV FPM_SLOWLOG /var/log/fpm-slow.log
 ENV FPM_SLOWLOG_TIMEOUT 2
 
-#nginx默认
-#ENV NGINX_PHP_CONF default
-
 #是否开启opache功能
 ENV ENABLE_OPCACHE "1"
 
@@ -35,13 +27,8 @@ ENV php_conf_d /etc/php7/conf.d
 ENV php_conf /etc/php7/php-fpm.conf
 ENV fpm_conf /etc/php7/php-fpm.d/www.conf
 
+ADD soft/ /letv/soft
 
-COPY soft/grpc-1.19.0.tgz /grpc-1.19.0.tgz
-COPY soft/protobuf-3.7.0.tgz /protobuf-3.7.0.tgz
-COPY soft/yaf-3.0.8.tgz /yaf-3.0.8.tgz
-COPY soft/scws-1.2.3.tar.bz2 /scws-1.2.3.tar.bz2
-COPY soft/ngx_http_qrcode_module.tar.gz /ngx_http_qrcode_module.tar.gz
-COPY soft/pecl-memcache-NON_BLOCKING_IO_php7.tar.gz /pecl-memcache-NON_BLOCKING_IO_php7.tar.gz
 
 #Docker Build openresty config
 ARG RESTY_VERSION="1.15.8.1"
@@ -105,6 +92,7 @@ RUN echo "https://mirrors.aliyun.com/alpine/v3.8/main/" > /etc/apk/repositories 
         readline-dev \
         zlib-dev \
         zlib \
+        re2c \
         ${RESTY_ADD_PACKAGE_BUILDDEPS} \
     && apk add --no-cache \
         libgcc \
@@ -113,6 +101,8 @@ RUN echo "https://mirrors.aliyun.com/alpine/v3.8/main/" > /etc/apk/repositories 
         zlib \
         librdkafka-dev \
         libqrencode-dev \
+        libmemcached \
+        libmemcached-dev \
         bash\
         php7 \
         php7-mbstring \
@@ -152,7 +142,6 @@ RUN echo "https://mirrors.aliyun.com/alpine/v3.8/main/" > /etc/apk/repositories 
         php7-opcache \
         php7-amqp \
         php7-ldap \
-        php7-memcached\
         php7-pdo_mysql \
         php7-pdo_pgsql \
         ${RESTY_ADD_PACKAGE_RUNDEPS}  \
@@ -177,13 +166,13 @@ RUN echo "https://mirrors.aliyun.com/alpine/v3.8/main/" > /etc/apk/repositories 
     && pecl install  igbinary-3.0.1 \
     && echo 'extension=igbinary.so' >> ${php_conf_d}/igbinary.ini \
     #=============== pecl install grpc ====================#
-    && pecl install ./grpc-1.19.0.tgz  \
+    && pecl install /letv/soft/grpc-1.19.0.tgz  \
     && echo 'extension=grpc.so' >> ${php_conf_d}/grpc.ini  \
     #=============== pecl install protobuf ====================#
-    && pecl install ./protobuf-3.7.0.tgz  \
+    && pecl install /letv/soft/protobuf-3.7.0.tgz  \
     && echo 'extension=protobuf.so' >> ${php_conf_d}/protobuf.ini  \
     #=============== pecl install yaf ====================#
-    && pecl install ./yaf-3.0.8.tgz  \
+    && pecl install /letv/soft/yaf-3.0.8.tgz  \
     && echo "config yaf"   \
     && echo '[yaf]' >> ${php_conf_d}/yaf.ini   \
     && echo 'extension=yaf.so' >> ${php_conf_d}/yaf.ini   \
@@ -191,8 +180,9 @@ RUN echo "https://mirrors.aliyun.com/alpine/v3.8/main/" > /etc/apk/repositories 
     && echo 'yaf.use_namespace=1' >> ${php_conf_d}/yaf.ini   \
     && echo 'yaf.use_spl_autoload=1' >> ${php_conf_d}/yaf.ini   \
     #===================install scws========================#
-    && tar xvf ./scws-1.2.3.tar.bz2 \
-    && cd /scws-1.2.3 \
+    && cd /letv/soft/ \
+    && tar xvf scws-1.2.3.tar.bz2 \
+    && cd scws-1.2.3 \
     && ./configure --prefix=/usr/local/scws \
     && make \
     && make install \
@@ -204,22 +194,28 @@ RUN echo "https://mirrors.aliyun.com/alpine/v3.8/main/" > /etc/apk/repositories 
     && make \
     && make install \
     && echo 'extension=scws.so' >> ${php_conf_d}/scws.ini  \
-    && cd / \
+    && cd /letv/soft/ \
     #===================install memcache========================#
-    && tar zxvf ./pecl-memcache-NON_BLOCKING_IO_php7.tar.gz \
-    && cd /pecl-memcache-NON_BLOCKING_IO_php7 \
+    && tar zxvf pecl-memcache-NON_BLOCKING_IO_php7.tar.gz \
+    && cd pecl-memcache-NON_BLOCKING_IO_php7 \
     && /usr/bin/phpize \
     && ./configure --with-php-config=/usr/bin/php-config \
     && make \
     && make install \
     && echo 'extension=memcache.so' >> ${php_conf_d}/memcache.ini  \
-    && cd / \
-    && tar zxf ./ngx_http_qrcode_module.tar.gz \
-    && mv ngx_http_qrcode_module/ /tmp/ \
-    #=================== delete install package ====================#
-    && rm -rf /scws-1.2.3 /pecl-memcache-NON_BLOCKING_IO_php7 ./scws-1.2.3.tar.bz2 ./pecl-memcache-NON_BLOCKING_IO_php7.tar.gz \
-    && rm -rf ./ngx_http_qrcode_module.tar.gz ./grpc-1.19.0.tgz ./protobuf-3.7.0.tgz ./yaf-3.0.8.tgz  \
+    && cd /letv/soft/ \
+    #===================install memcached========================#
+    && tar zxvf memcached-3.0.4.tgz \
+    && cd memcached-3.0.4 \
+    && /usr/bin/phpize \
+    && ./configure --with-php-config=/usr/bin/php-config --enable-memcached-json --enable-memcached-igbinary \
+    && make \
+    && make install \
+    && echo 'extension=memcached.so' >> ${php_conf_d}/memcached.ini \
+    && cd /letv/soft/ \
     #===================install openresty ====================#
+    && tar zxf ngx_http_qrcode_module.tar.gz \
+    && mv /letv/soft/ngx_http_qrcode_module/ /tmp/ \
     && cd /tmp \
     && if [ -n "${RESTY_EVAL_PRE_CONFIGURE}" ]; then eval $(echo ${RESTY_EVAL_PRE_CONFIGURE}); fi \
     && curl -fSL https://www.openssl.org/source/openssl-${RESTY_OPENSSL_VERSION}.tar.gz -o openssl-${RESTY_OPENSSL_VERSION}.tar.gz \
@@ -239,17 +235,11 @@ RUN echo "https://mirrors.aliyun.com/alpine/v3.8/main/" > /etc/apk/repositories 
         openssl-${RESTY_OPENSSL_VERSION}.tar.gz \
         openresty-${RESTY_VERSION}.tar.gz openresty-${RESTY_VERSION} \
         pcre-${RESTY_PCRE_VERSION}.tar.gz pcre-${RESTY_PCRE_VERSION} \
-    && apk del .build-deps
+    && apk del .build-deps \
+    && rm -rf /letv/soft/
 #    && ln -sf /dev/stdout /usr/local/openresty/nginx/logs/access.log \
 #    && ln -sf /dev/stderr /usr/local/openresty/nginx/logs/error.log
 ENV LD_PRELOAD /usr/lib/preloadable_libiconv.so php
 ENV PATH=$PATH:/usr/local/openresty/luajit/bin:/usr/local/openresty/nginx/sbin:/usr/local/openresty/bin
-
-COPY ./run.sh /run.sh
 COPY --from=ochinchina/supervisord:latest /usr/local/bin/supervisord /usr/local/bin/supervisord
 COPY ./supervisor.conf /supervisor.conf
-WORKDIR /letv/www
-EXPOSE 80
-STOPSIGNAL SIGTERM
-ENTRYPOINT ["/bin/bash"]
-CMD ["/run.sh"]
